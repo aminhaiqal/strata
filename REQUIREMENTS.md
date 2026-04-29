@@ -959,7 +959,3 @@ Track these from day one:
 Axelyn Strata Finance helps JMB and MC teams recover unpaid maintenance fees faster by replacing manual spreadsheets with a live collection control system.
 
 It gives admins real-time visibility into outstanding balances, overdue units, payment proofs, installment plans, and follow-up status.
-
-```text
-This should be your **backend requirement baseline** before writing the first API.
-```
