@@ -1,0 +1,291 @@
+Project strata_finance {
+  database_type: 'PostgreSQL'
+  Note: 'Axelyn Strata Finance data model (MVP)'
+}
+
+Table residences {
+  id int [pk, increment]
+  name varchar(200) [not null]
+  address text [not null]
+  timezone varchar(64) [not null]
+  currency varchar(3) [not null]
+  billing_cycle_day int [not null]
+  status varchar [not null, note: 'active|inactive']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'One residential community'
+}
+
+Table blocks {
+  id int [pk, increment]
+  residence_id int [not null]
+  name varchar(120) [not null]
+  description text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table units {
+  id int [pk, increment]
+  residence_id int [not null]
+  block_id int [not null]
+  unit_number varchar(40) [not null]
+  floor varchar(20)
+  unit_type varchar(50)
+  owner_name varchar(120)
+  owner_phone varchar(40)
+  owner_email varchar(254)
+  tenant_name varchar(120)
+  tenant_phone varchar(40)
+  tenant_email varchar(254)
+  is_occupied boolean [not null, default: true]
+  status varchar [not null, note: 'active|inactive']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (residence_id, block_id, unit_number) [unique]
+  }
+}
+
+Table users {
+  id int [pk, increment]
+  residence_id int [not null]
+  name varchar(120) [not null]
+  email varchar(254) [not null]
+  phone varchar(40)
+  password_hash varchar(255) [not null]
+  role varchar [not null, note: 'super_admin|residence_admin|finance_admin|resident']
+  status varchar [not null, note: 'active|inactive']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (residence_id, email) [unique]
+  }
+}
+
+Table unit_users {
+  id int [pk, increment]
+  unit_id int [not null]
+  user_id int [not null]
+  relationship_type varchar [not null, note: 'owner|tenant|representative']
+  created_at timestamptz [not null]
+
+  indexes {
+    (unit_id, user_id) [unique]
+  }
+}
+
+Table charges {
+  id int [pk, increment]
+  residence_id int [not null]
+  unit_id int [not null]
+  charge_type varchar(60) [not null]
+  description text
+  amount numeric(12,2) [not null]
+  billing_month date [not null]
+  due_date date [not null]
+  status varchar [not null, note: 'pending|partially_paid|paid|waived|cancelled|overdue']
+  created_by int [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table payments {
+  id int [pk, increment]
+  residence_id int [not null]
+  unit_id int [not null]
+  amount numeric(12,2) [not null]
+  payment_date date [not null]
+  payment_method varchar(60) [not null]
+  reference_no varchar(100)
+  status varchar [not null, note: 'pending_verification|verified|rejected|cancelled']
+  submitted_by int [not null]
+  verified_by int
+  verified_at timestamptz
+  rejected_reason text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table payment_proofs {
+  id int [pk, increment]
+  payment_id int [not null]
+  storage_provider varchar(40) [not null, default: 'cloudflare_r2']
+  file_key varchar(500) [not null]
+  mime_type varchar(120) [not null]
+  file_size int [not null]
+  uploaded_by int [not null]
+  created_at timestamptz [not null]
+}
+
+Table payment_allocations {
+  id int [pk, increment]
+  payment_id int [not null]
+  charge_id int [not null]
+  amount_allocated numeric(12,2) [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (payment_id, charge_id) [unique]
+  }
+}
+
+Table installment_plans {
+  id int [pk, increment]
+  residence_id int [not null]
+  unit_id int [not null]
+  total_amount numeric(12,2) [not null]
+  start_date date [not null]
+  end_date date [not null]
+  status varchar [not null, note: 'active|completed|defaulted|cancelled']
+  created_by int [not null]
+  approved_by int
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table installment_schedules {
+  id int [pk, increment]
+  installment_plan_id int [not null]
+  due_date date [not null]
+  amount_due numeric(12,2) [not null]
+  amount_paid numeric(12,2) [not null, default: 0.00]
+  status varchar [not null, note: 'pending|partially_paid|paid|missed']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table follow_up_records {
+  id int [pk, increment]
+  residence_id int [not null]
+  unit_id int [not null]
+  follow_up_type varchar [not null, note: 'whatsapp|phone_call|email|in_person|notice_letter|legal_warning|other']
+  message text [not null]
+  next_follow_up_date date
+  status varchar [not null, note: 'open|done|no_response|promised_to_pay|escalated']
+  created_by int [not null]
+  created_at timestamptz [not null]
+}
+
+Table admin_notes {
+  id int [pk, increment]
+  residence_id int [not null]
+  unit_id int [not null]
+  note text [not null]
+  visibility varchar [not null, note: 'internal_only|visible_to_finance_admin|visible_to_resident']
+  created_by int [not null]
+  created_at timestamptz [not null]
+}
+
+Table account_snapshots {
+  id int [pk, increment]
+  residence_id int [not null]
+  unit_id int [not null]
+  total_charged numeric(12,2) [not null]
+  total_paid numeric(12,2) [not null]
+  total_outstanding numeric(12,2) [not null]
+  pending_payment_amount numeric(12,2) [not null]
+  oldest_unpaid_due_date date
+  months_overdue int [not null, default: 0]
+  classification varchar [not null, note: 'healthy|pending_verification|recently_overdue|long_overdue|never_paid|irregular|legacy_debtor|on_installment|under_review']
+  last_payment_date date
+  last_follow_up_date date
+  updated_at timestamptz [not null]
+
+  indexes {
+    (residence_id, unit_id) [unique]
+  }
+}
+
+Table import_batches {
+  id int [pk, increment]
+  residence_id int [not null]
+  import_type varchar [not null, note: 'units|opening_balances|historical_payments|monthly_charges']
+  filename varchar(255) [not null]
+  status varchar [not null, note: 'uploaded|validated|processing|completed|failed|cancelled']
+  total_rows int [not null, default: 0]
+  success_rows int [not null, default: 0]
+  failed_rows int [not null, default: 0]
+  uploaded_by int [not null]
+  created_at timestamptz [not null]
+  completed_at timestamptz
+}
+
+Table import_errors {
+  id int [pk, increment]
+  import_batch_id int [not null]
+  row_number int [not null]
+  field varchar(120) [not null]
+  error_message text [not null]
+  raw_value text
+}
+
+Table audit_logs {
+  id int [pk, increment]
+  residence_id int [not null]
+  actor_user_id int [not null]
+  entity_type varchar(100) [not null]
+  entity_id varchar(100) [not null]
+  action varchar(120) [not null]
+  before_json json
+  after_json json
+  ip_address varchar(64)
+  user_agent text
+  created_at timestamptz [not null]
+}
+
+Table notifications {
+  id int [pk, increment]
+  residence_id int [not null]
+  recipient_user_id int [not null]
+  unit_id int
+  type varchar [not null, note: 'payment_submitted|payment_verified|payment_rejected|overdue_reminder|installment_due|follow_up_due']
+  channel varchar [not null, note: 'in_app|email|whatsapp_manual|whatsapp_api_later']
+  title varchar(200) [not null]
+  message text [not null]
+  status varchar [not null, note: 'pending|sent|failed|cancelled']
+  sent_at timestamptz
+  created_at timestamptz [not null]
+}
+
+Ref: blocks.residence_id > residences.id
+Ref: units.residence_id > residences.id
+Ref: units.block_id > blocks.id
+Ref: users.residence_id > residences.id
+Ref: unit_users.unit_id > units.id
+Ref: unit_users.user_id > users.id
+Ref: charges.residence_id > residences.id
+Ref: charges.unit_id > units.id
+Ref: charges.created_by > users.id
+Ref: payments.residence_id > residences.id
+Ref: payments.unit_id > units.id
+Ref: payments.submitted_by > users.id
+Ref: payments.verified_by > users.id
+Ref: payment_proofs.payment_id > payments.id
+Ref: payment_proofs.uploaded_by > users.id
+Ref: payment_allocations.payment_id > payments.id
+Ref: payment_allocations.charge_id > charges.id
+Ref: installment_plans.residence_id > residences.id
+Ref: installment_plans.unit_id > units.id
+Ref: installment_plans.created_by > users.id
+Ref: installment_plans.approved_by > users.id
+Ref: installment_schedules.installment_plan_id > installment_plans.id
+Ref: follow_up_records.residence_id > residences.id
+Ref: follow_up_records.unit_id > units.id
+Ref: follow_up_records.created_by > users.id
+Ref: admin_notes.residence_id > residences.id
+Ref: admin_notes.unit_id > units.id
+Ref: admin_notes.created_by > users.id
+Ref: account_snapshots.residence_id > residences.id
+Ref: account_snapshots.unit_id > units.id
+Ref: import_batches.residence_id > residences.id
+Ref: import_batches.uploaded_by > users.id
+Ref: import_errors.import_batch_id > import_batches.id
+Ref: audit_logs.residence_id > residences.id
+Ref: audit_logs.actor_user_id > users.id
+Ref: notifications.residence_id > residences.id
+Ref: notifications.recipient_user_id > users.id
+Ref: notifications.unit_id > units.id

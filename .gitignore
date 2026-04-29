@@ -1,0 +1,58 @@
+# OS and editor artifacts
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+.cache/
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.venv/
+venv/
+
+# Rust
+**/target/
+
+# JavaScript/TypeScript (for future apps/web usage)
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
+*.tsbuildinfo
+
+# Tool/runtime caches
+.bun/
+pnpm-store/
+.npm/
+.yarn/
+
+# Keep lockfiles for reproducible builds
+# (Cargo.lock and uv.lock are intentionally tracked)
+
+# Local Codex state
+.codex
