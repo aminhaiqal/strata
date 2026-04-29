@@ -5,8 +5,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import get_db
+from routes import resident_router
 
 app = FastAPI(title="Strata API")
+app.include_router(resident_router)
 
 
 @app.get("/health")
@@ -18,4 +20,3 @@ def healthcheck() -> dict[str, str]:
 def database_healthcheck(db: Session = Depends(get_db)) -> dict[str, str]:
     db.execute(text("SELECT 1"))
     return {"status": "ok"}
-
