@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    networks:
+      - internal
+    environment:
+      - POSTGRES_DB=axlstrata-n1
+      - POSTGRES_USER=paxlstrata-n1
+      - POSTGRES_PASSWORD=KDufi0f5VZerAt
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+networks:
+  proxy:
+    external: true
+  internal:
+    driver: overlay
+    internal: true
+
+volumes:
+  pg_data:
