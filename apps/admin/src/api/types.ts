@@ -103,7 +103,6 @@ export type ImportBatch = {
 }
 
 export type AdminLoginRequest = {
-  residence_id: number
   email: string
   password: string
 }

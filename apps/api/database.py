@@ -15,7 +15,7 @@ def _build_database_url() -> str:
 
     user = os.getenv("POSTGRES_USER", "paxlstrata-n1")
     password = os.getenv("POSTGRES_PASSWORD", "KDufi0f5VZerAt")
-    host = os.getenv("POSTGRES_HOST", "db")
+    host = os.getenv("POSTGRES_HOST", "127.0.0.1")
     port = os.getenv("POSTGRES_PORT", "5432")
     database = os.getenv("POSTGRES_DB", "axlstrata-n1")
 

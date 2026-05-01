@@ -4,7 +4,7 @@ The API now uses SQLAlchemy sessions from `database.py`.
 
 Default connection settings match `infra/stack.yml`:
 
-- host: `db`
+- host: `127.0.0.1`
 - port: `5432`
 - database: `axlstrata-n1`
 - user: `paxlstrata-n1`
@@ -81,6 +81,32 @@ def create_charge(db: Session = Depends(get_db)) -> dict[str, int]:
 
 - `GET /health`
 - `GET /health/db`
+
+## Bootstrap first admin
+
+There is no public "register admin" endpoint yet. Create the first `residence_admin`
+directly in the database with the bootstrap script.
+
+```bash
+cd apps/api
+uv run python scripts/bootstrap_admin.py \
+  --admin-name "Residence Admin" \
+  --admin-email "admin@example.com" \
+  --admin-password "secret123" \
+  --residence-name "Residency One" \
+  --residence-address "123 Street, Kuala Lumpur"
+```
+
+If the residence already exists, use its id instead:
+
+```bash
+cd apps/api
+uv run python scripts/bootstrap_admin.py \
+  --admin-name "Residence Admin" \
+  --admin-email "admin@example.com" \
+  --admin-password "secret123" \
+  --residence-id 1
+```
 
 ## Resident authentication
 

@@ -8,13 +8,11 @@ import {
 import './App.css'
 
 type LoginFormState = {
-  residenceId: string
   email: string
   password: string
 }
 
 const INITIAL_FORM: LoginFormState = {
-  residenceId: '',
   email: '',
   password: '',
 }
@@ -62,20 +60,12 @@ function App() {
   async function handleLoginSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const residenceId = Number(form.residenceId)
-    if (!Number.isInteger(residenceId) || residenceId <= 0) {
-      setErrorMessage('Residence ID must be a positive number.')
-      setStatus('error')
-      return
-    }
-
     setIsSubmitting(true)
     setErrorMessage(null)
     setStatus('loading')
 
     try {
       const nextShell = await loginAdmin({
-        residence_id: residenceId,
         email: form.email,
         password: form.password,
       })
@@ -122,19 +112,6 @@ function App() {
             </div>
 
             <form className="login-form" onSubmit={handleLoginSubmit}>
-              <label className="field">
-                <span>Residence ID</span>
-                <input
-                  type="number"
-                  min="1"
-                  inputMode="numeric"
-                  value={form.residenceId}
-                  onChange={(event) => updateField('residenceId', event.target.value)}
-                  placeholder="1"
-                  required
-                />
-              </label>
-
               <label className="field">
                 <span>Email</span>
                 <input

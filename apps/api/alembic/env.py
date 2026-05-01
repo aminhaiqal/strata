@@ -1,5 +1,6 @@
 from logging.config import fileConfig
 import os
+from urllib.parse import quote_plus
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -28,6 +29,23 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+def get_database_url() -> str:
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url
+
+    user = os.getenv("POSTGRES_USER", "paxlstrata-n1")
+    password = os.getenv("POSTGRES_PASSWORD", "KDufi0f5VZerAt")
+    host = os.getenv("POSTGRES_HOST", "127.0.0.1")
+    port = os.getenv("POSTGRES_PORT", "5432")
+    database = os.getenv("POSTGRES_DB", "axlstrata-n1")
+
+    return (
+        f"postgresql+psycopg://{quote_plus(user)}:{quote_plus(password)}"
+        f"@{host}:{port}/{quote_plus(database)}"
+    )
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -40,7 +58,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    url = get_database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -60,7 +78,7 @@ def run_migrations_online() -> None:
 
     """
     section = config.get_section(config.config_ini_section, {})
-    section["sqlalchemy.url"] = os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    section["sqlalchemy.url"] = get_database_url()
     connectable = engine_from_config(
         section,
         prefix="sqlalchemy.",
