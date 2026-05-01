@@ -133,7 +133,7 @@ class AuthApiTests(unittest.TestCase):
     def test_resident_login_returns_bearer_token(self) -> None:
         with Session(self.engine) as db:
             response = resident_login(
-                ResidentLoginRequest(residence_id=1, email="resident@example.com", password="secret123"),
+                ResidentLoginRequest(email="resident@example.com", password="secret123"),
                 db,
             )
 
@@ -145,7 +145,7 @@ class AuthApiTests(unittest.TestCase):
         with Session(self.engine) as db:
             with self.assertRaises(HTTPException) as error:
                 resident_login(
-                    ResidentLoginRequest(residence_id=1, email="resident@example.com", password="wrong"),
+                    ResidentLoginRequest(email="resident@example.com", password="wrong"),
                     db,
                 )
 
@@ -155,7 +155,6 @@ class AuthApiTests(unittest.TestCase):
         with Session(self.engine) as db:
             user = authenticate_resident(
                 db=db,
-                residence_id=1,
                 email="finance@example.com",
                 password="secret123",
             )
@@ -166,7 +165,6 @@ class AuthApiTests(unittest.TestCase):
         with Session(self.engine) as db:
             user = authenticate_resident(
                 db=db,
-                residence_id=1,
                 email="inactive@example.com",
                 password="secret123",
             )

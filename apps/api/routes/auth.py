@@ -12,7 +12,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class ResidentLoginRequest(BaseModel):
-    residence_id: int
     email: str
     password: str
 
@@ -25,7 +24,6 @@ class ResidentLoginResponse(BaseModel):
 
 
 class AdminLoginRequest(BaseModel):
-    residence_id: int
     email: str
     password: str
 
@@ -41,7 +39,6 @@ class AdminLoginResponse(BaseModel):
 def resident_login(payload: ResidentLoginRequest, db: Session = Depends(get_db)) -> ResidentLoginResponse:
     user = authenticate_resident(
         db=db,
-        residence_id=payload.residence_id,
         email=payload.email,
         password=payload.password,
     )
@@ -64,7 +61,6 @@ def resident_login(payload: ResidentLoginRequest, db: Session = Depends(get_db))
 def admin_login(payload: AdminLoginRequest, db: Session = Depends(get_db)) -> AdminLoginResponse:
     user = authenticate_admin(
         db=db,
-        residence_id=payload.residence_id,
         email=payload.email,
         password=payload.password,
     )

@@ -1,121 +1,203 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { startTransition, useEffect, useState } from 'react'
+import {
+  hydrateAdminShell,
+  loginAdmin,
+  logoutAdmin,
+  type AdminShellState,
+} from './application/admin-shell'
 import './App.css'
 
+type LoginFormState = {
+  residenceId: string
+  email: string
+  password: string
+}
+
+const INITIAL_FORM: LoginFormState = {
+  residenceId: '',
+  email: '',
+  password: '',
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [shell, setShell] = useState<AdminShellState | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [form, setForm] = useState<LoginFormState>(INITIAL_FORM)
+
+  useEffect(() => {
+    let cancelled = false
+
+    void hydrateAdminShell()
+      .then((nextShell) => {
+        if (cancelled) {
+          return
+        }
+
+        setShell(nextShell)
+        setStatus('ready')
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return
+        }
+
+        setErrorMessage(error instanceof Error ? error.message : 'Unknown API error')
+        setStatus('error')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  function updateField<Key extends keyof LoginFormState>(key: Key, value: LoginFormState[Key]) {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }))
+  }
+
+  async function handleLoginSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const residenceId = Number(form.residenceId)
+    if (!Number.isInteger(residenceId) || residenceId <= 0) {
+      setErrorMessage('Residence ID must be a positive number.')
+      setStatus('error')
+      return
+    }
+
+    setIsSubmitting(true)
+    setErrorMessage(null)
+    setStatus('loading')
+
+    try {
+      const nextShell = await loginAdmin({
+        residence_id: residenceId,
+        email: form.email,
+        password: form.password,
+      })
+
+      startTransition(() => {
+        setShell(nextShell)
+        setStatus('ready')
+      })
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in.')
+      setStatus('error')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  function handleLogout() {
+    logoutAdmin()
+    setShell({ status: 'signed_out' })
+    setStatus('ready')
+    setErrorMessage(null)
+    setForm(INITIAL_FORM)
+  }
+
+  const signedOut = shell?.status === 'signed_out' || shell === null
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+    <main className="app-shell">
+      <section className="hero-panel">
+        <div className="hero-copy">
+          <p className="eyebrow">Strata Admin</p>
+          <h1>Sign in before the dashboard UI exists.</h1>
+          <p className="summary">
+            This screen only handles access. The data layer is already split into admin auth,
+            residences, blocks, units, residents, and imports modules behind the scenes.
           </p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+
+        {signedOut ? (
+          <div className="panel login-panel">
+            <div className="panel-header">
+              <h2>Admin login</h2>
+              <p>Use residence admin credentials from the API.</p>
+            </div>
+
+            <form className="login-form" onSubmit={handleLoginSubmit}>
+              <label className="field">
+                <span>Residence ID</span>
+                <input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  value={form.residenceId}
+                  onChange={(event) => updateField('residenceId', event.target.value)}
+                  placeholder="1"
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => updateField('email', event.target.value)}
+                  placeholder="admin@example.com"
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>Password</span>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(event) => updateField('password', event.target.value)}
+                  placeholder="••••••••"
+                  required
+                />
+              </label>
+
+              {status === 'loading' ? <p className="status-note">Signing in...</p> : null}
+              {status === 'error' && errorMessage ? <p className="error">{errorMessage}</p> : null}
+
+              <button className="submit-button" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Signing in...' : 'Sign in'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="panel session-panel">
+            <div className="panel-header">
+              <h2>Session ready</h2>
+              <p>The login flow is live. Dashboard UI can be layered on top next.</p>
+            </div>
+
+            <div className="session-meta">
+              <div>
+                <span className="meta-label">Admin</span>
+                <strong>{shell.session.user.name}</strong>
+              </div>
+              <div>
+                <span className="meta-label">Residence</span>
+                <strong>{shell.session.user.residence_id}</strong>
+              </div>
+              <div>
+                <span className="meta-label">Role</span>
+                <strong>{shell.session.user.role}</strong>
+              </div>
+            </div>
+
+            {status === 'error' && errorMessage ? <p className="error">{errorMessage}</p> : null}
+
+            <pre>{JSON.stringify(shell.data, null, 2)}</pre>
+
+            <button className="secondary-button" type="button" onClick={handleLogout}>
+              Sign out
+            </button>
+          </div>
+        )}
       </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    </main>
   )
 }
 

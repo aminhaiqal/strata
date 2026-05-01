@@ -14,7 +14,6 @@ Payload:
 
 ```json
 {
-  "residence_id": 1,
   "email": "resident@example.com",
   "password": "secret123"
 }
@@ -58,7 +57,6 @@ Payload:
 
 ```json
 {
-  "residence_id": 1,
   "email": "admin@example.com",
   "password": "secret123"
 }

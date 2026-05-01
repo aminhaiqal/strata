@@ -177,7 +177,7 @@ class AdminResidentApiTests(unittest.TestCase):
     def test_admin_login_returns_bearer_token(self) -> None:
         with Session(self.engine) as db:
             response = admin_login(
-                AdminLoginRequest(residence_id=1, email="admin@example.com", password="secret123"),
+                AdminLoginRequest(email="admin@example.com", password="secret123"),
                 db,
             )
 
@@ -188,7 +188,6 @@ class AdminResidentApiTests(unittest.TestCase):
         with Session(self.engine) as db:
             user = authenticate_admin(
                 db=db,
-                residence_id=1,
                 email="finance@example.com",
                 password="secret123",
             )

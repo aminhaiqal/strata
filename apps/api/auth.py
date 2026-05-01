@@ -92,10 +92,9 @@ def create_access_token(*, user: User) -> tuple[str, int]:
     return _encode_jwt(payload), expires_in
 
 
-def authenticate_resident(*, db: Session, residence_id: int, email: str, password: str) -> User | None:
+def authenticate_resident(*, db: Session, email: str, password: str) -> User | None:
     user = db.scalar(
         select(User).where(
-            User.residence_id == residence_id,
             User.email == normalize_email(email),
         )
     )
@@ -108,10 +107,9 @@ def authenticate_resident(*, db: Session, residence_id: int, email: str, passwor
     return user
 
 
-def authenticate_admin(*, db: Session, residence_id: int, email: str, password: str) -> User | None:
+def authenticate_admin(*, db: Session, email: str, password: str) -> User | None:
     user = db.scalar(
         select(User).where(
-            User.residence_id == residence_id,
             User.email == normalize_email(email),
         )
     )
