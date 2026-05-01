@@ -7,6 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from auth import normalize_email
 from models.db import (
     Charge,
     InstallmentPlan,
@@ -56,7 +57,7 @@ class ResidentService:
         resident = User(
             residence_id=command.residence_id,
             name=command.name,
-            email=command.email,
+            email=normalize_email(command.email),
             phone=command.phone,
             password_hash=command.password_hash,
             role=UserRole.resident,

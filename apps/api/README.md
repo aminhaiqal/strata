@@ -82,13 +82,18 @@ def create_charge(db: Session = Depends(get_db)) -> dict[str, int]:
 - `GET /health`
 - `GET /health/db`
 
-## Resident testing
+## Resident authentication
 
 Resident routes are available under `/resident`.
 
-Current temporary auth for testing:
+Login with:
 
-- send `X-Resident-User-Id: <user_id>` in the request header
+- `POST /auth/resident/login`
+- request body: `residence_id`, `email`, `password`
+
+Use the returned bearer token on resident requests:
+
+- `Authorization: Bearer <access_token>`
 
 Resident endpoints:
 
@@ -98,5 +103,3 @@ Resident endpoints:
 - `GET /resident/units/{unit_id}/payments`
 - `POST /resident/units/{unit_id}/payments`
 - `GET /resident/units/{unit_id}/installment-plan`
-
-This is only a testing bridge until real authentication and authorization middleware is implemented.
