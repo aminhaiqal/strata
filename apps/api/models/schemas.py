@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .db import (
     ChargeStatus,
@@ -220,6 +220,15 @@ class AccountSnapshotSchema(ORMBase):
     updated_at: datetime
 
 
+class ImportErrorSchema(ORMBase):
+    id: int
+    import_batch_id: int
+    row_number: int
+    field: str
+    error_message: str
+    raw_value: str | None
+
+
 class ImportBatchSchema(ORMBase):
     id: int
     residence_id: int
@@ -232,15 +241,7 @@ class ImportBatchSchema(ORMBase):
     uploaded_by: int
     created_at: datetime
     completed_at: datetime | None
-
-
-class ImportErrorSchema(ORMBase):
-    id: int
-    import_batch_id: int
-    row_number: int
-    field: str
-    error_message: str
-    raw_value: str | None
+    errors: list[ImportErrorSchema] = Field(default_factory=list)
 
 
 class AuditLogSchema(ORMBase):
