@@ -34,6 +34,13 @@ class AuthenticatedUser:
     role: UserRole
 
 
+@dataclass(slots=True)
+class AuthenticatedAdmin:
+    id: int
+    residence_id: int
+    role: UserRole
+
+
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -101,6 +108,22 @@ def authenticate_resident(*, db: Session, residence_id: int, email: str, passwor
     return user
 
 
+def authenticate_admin(*, db: Session, residence_id: int, email: str, password: str) -> User | None:
+    user = db.scalar(
+        select(User).where(
+            User.residence_id == residence_id,
+            User.email == normalize_email(email),
+        )
+    )
+    if user is None:
+        return None
+    if user.role != UserRole.residence_admin or user.status != EntityStatus.active:
+        return None
+    if not verify_password(password, user.password_hash):
+        return None
+    return user
+
+
 def get_current_resident_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     db: Session = Depends(get_db),
@@ -126,6 +149,33 @@ def get_current_resident_user(
         raise _forbidden("User is not authorized for resident access")
 
     return AuthenticatedUser(id=user.id, residence_id=user.residence_id, role=user.role)
+
+
+def get_current_admin_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    db: Session = Depends(get_db),
+) -> AuthenticatedAdmin:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise _unauthorized("Authentication credentials were not provided")
+
+    payload = _decode_jwt(credentials.credentials)
+    try:
+        user_id = int(payload["sub"])
+        residence_id = int(payload["residence_id"])
+        role = UserRole(payload["role"])
+    except (KeyError, TypeError, ValueError):
+        raise _unauthorized("Invalid authentication token") from None
+
+    if role != UserRole.residence_admin:
+        raise _forbidden("User is not authorized for admin access")
+
+    user = db.get(User, user_id)
+    if user is None or user.status != EntityStatus.active:
+        raise _unauthorized("User account is not available")
+    if user.role != UserRole.residence_admin or user.residence_id != residence_id:
+        raise _forbidden("User is not authorized for admin access")
+
+    return AuthenticatedAdmin(id=user.id, residence_id=user.residence_id, role=user.role)
 
 
 def _encode_jwt(payload: dict[str, Any]) -> str:

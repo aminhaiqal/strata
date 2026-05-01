@@ -5,9 +5,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import get_db
-from routes import auth_router, resident_router
+from routes import admin_router, auth_router, resident_router
 
 app = FastAPI(title="Strata API")
+app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(resident_router)
 

@@ -90,6 +90,13 @@ class UnitUserSchema(ORMBase):
     created_at: datetime
 
 
+class UnitResidentLinkSchema(BaseModel):
+    unit_id: int
+    user_id: int
+    relationship_type: UnitUserRelationshipType
+    resident: UserSchema
+
+
 class ChargeSchema(ORMBase):
     id: int
     residence_id: int
@@ -131,6 +138,15 @@ class PaymentProofSchema(ORMBase):
     file_size: int
     uploaded_by: int
     created_at: datetime
+
+
+class PaymentProofAccessSchema(BaseModel):
+    payment_id: int
+    file_key: str
+    mime_type: str
+    file_size: int
+    url: str
+    expires_in: int
 
 
 class PaymentAllocationSchema(ORMBase):

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,7 +12,14 @@ from application import ApplicationError, NotFoundError, ResidentService, Submit
 from auth import AuthenticatedUser, get_current_resident_user
 from database import get_db
 from models.db import AccountSnapshot
-from models.schemas import ChargeSchema, InstallmentPlanSchema, PaymentSchema, UnitSchema
+from models.schemas import ChargeSchema, InstallmentPlanSchema, PaymentProofAccessSchema, PaymentSchema, UnitSchema
+from storage import (
+    ALLOWED_PAYMENT_PROOF_MIME_TYPES,
+    MAX_PAYMENT_PROOF_SIZE_BYTES,
+    PaymentProofStorage,
+    StorageError,
+    get_payment_proof_storage,
+)
 
 router = APIRouter(prefix="/resident", tags=["resident"])
 
@@ -28,13 +35,6 @@ class ResidentBalanceSchema(BaseModel):
     classification: str
     last_payment_date: date | None
     last_follow_up_date: date | None
-
-
-class ResidentPaymentCreateRequest(BaseModel):
-    amount: Decimal
-    payment_date: date
-    payment_method: str
-    reference_no: str | None = None
 
 
 def _raise_http_error(error: ApplicationError) -> None:
@@ -121,24 +121,60 @@ def list_unit_payments(
         _raise_http_error(error)
 
 
+@router.get("/payments/{payment_id}/proof", response_model=PaymentProofAccessSchema)
+def get_payment_proof(
+    payment_id: int,
+    current_user: AuthenticatedUser = Depends(get_current_resident_user),
+    db: Session = Depends(get_db),
+    storage: PaymentProofStorage = Depends(get_payment_proof_storage),
+) -> PaymentProofAccessSchema:
+    service = ResidentService(db)
+    try:
+        proof_access = service.get_payment_proof_access(current_user.id, payment_id)
+        signed_url = storage.generate_payment_proof_download_url(file_key=proof_access.proof.file_key)
+        return PaymentProofAccessSchema(
+            payment_id=proof_access.payment.id,
+            file_key=proof_access.proof.file_key,
+            mime_type=proof_access.proof.mime_type,
+            file_size=proof_access.proof.file_size,
+            url=signed_url.url,
+            expires_in=signed_url.expires_in,
+        )
+    except ApplicationError as error:
+        _raise_http_error(error)
+    except StorageError as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+
+
 @router.post("/units/{unit_id}/payments", response_model=PaymentSchema, status_code=status.HTTP_201_CREATED)
 def submit_payment(
     unit_id: int,
-    payload: ResidentPaymentCreateRequest,
+    amount: Decimal = Form(...),
+    payment_date: date = Form(...),
+    payment_method: str = Form(...),
+    reference_no: str | None = Form(None),
+    proof_file: UploadFile = File(...),
     current_user: AuthenticatedUser = Depends(get_current_resident_user),
     db: Session = Depends(get_db),
+    storage: PaymentProofStorage = Depends(get_payment_proof_storage),
 ) -> PaymentSchema:
     service = ResidentService(db)
     try:
+        proof_content = proof_file.file.read()
+        _validate_payment_proof_file(proof_file, proof_content)
         payment = service.submit_payment(
             SubmitResidentPayment(
                 resident_user_id=current_user.id,
                 unit_id=unit_id,
-                amount=payload.amount,
-                payment_date=payload.payment_date,
-                payment_method=payload.payment_method,
-                reference_no=payload.reference_no,
-            )
+                amount=amount,
+                payment_date=payment_date,
+                payment_method=payment_method,
+                reference_no=reference_no,
+                proof_filename=proof_file.filename,
+                proof_content_type=proof_file.content_type or "",
+                proof_content=proof_content,
+            ),
+            storage=storage,
         )
         db.commit()
         db.refresh(payment)
@@ -146,6 +182,21 @@ def submit_payment(
     except ApplicationError as error:
         db.rollback()
         _raise_http_error(error)
+    except StorageError as error:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+
+
+def _validate_payment_proof_file(proof_file: UploadFile, proof_content: bytes) -> None:
+    if not proof_content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="payment proof file is required")
+
+    content_type = proof_file.content_type or ""
+    if content_type not in ALLOWED_PAYMENT_PROOF_MIME_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="unsupported payment proof file type")
+
+    if len(proof_content) > MAX_PAYMENT_PROOF_SIZE_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="payment proof file is too large")
 
 
 @router.get("/units/{unit_id}/installment-plan", response_model=InstallmentPlanSchema | None)
