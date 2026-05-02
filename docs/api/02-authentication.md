@@ -10,6 +10,9 @@ Purpose:
 Headers:
 - `Content-Type: application/json`
 
+Browser note:
+- when the admin or resident web app calls this endpoint from a different origin, the browser may send `OPTIONS /auth/.../login` first as a CORS preflight before the documented `POST`
+
 Payload:
 
 ```json
@@ -52,6 +55,9 @@ Purpose:
 
 Headers:
 - `Content-Type: application/json`
+
+Browser note:
+- when the admin web app calls this endpoint from a different origin, the browser may send `OPTIONS /auth/admin/login` first as a CORS preflight before the documented `POST`
 
 Payload:
 

@@ -2,6 +2,16 @@
 
 The API now uses SQLAlchemy sessions from `database.py`.
 
+## Required auth config
+
+Set `JWT_SECRET` before starting the API. The app now fails at startup if this is missing.
+
+Example:
+
+```bash
+export JWT_SECRET="$(openssl rand -hex 32)"
+```
+
 Default connection settings match `infra/stack.yml`:
 
 - host: `127.0.0.1`
@@ -115,7 +125,7 @@ Resident routes are available under `/resident`.
 Login with:
 
 - `POST /auth/resident/login`
-- request body: `residence_id`, `email`, `password`
+- request body: `email`, `password`
 
 Use the returned bearer token on resident requests:
 
@@ -129,3 +139,14 @@ Resident endpoints:
 - `GET /resident/units/{unit_id}/payments`
 - `POST /resident/units/{unit_id}/payments`
 - `GET /resident/units/{unit_id}/installment-plan`
+
+## CORS for local frontend apps
+
+The API accepts browser preflight requests for common local frontend origins by default:
+
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
+
+Override this with `CORS_ALLOWED_ORIGINS`, using a comma-separated list of origins.

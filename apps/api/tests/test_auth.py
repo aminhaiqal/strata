@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import unittest
 from datetime import date
@@ -18,6 +19,7 @@ from auth import (
     get_current_resident_user,
     hash_password,
 )
+from main import app
 from routes.auth import ResidentLoginRequest, resident_login
 from routes.resident import list_linked_units
 from models.db import (
@@ -200,6 +202,49 @@ class AuthApiTests(unittest.TestCase):
                 )
 
         self.assertEqual(error.exception.status_code, 401)
+
+    def test_admin_login_preflight_is_allowed_for_local_admin_app(self) -> None:
+        async def exercise_preflight() -> tuple[int | None, dict[str, str]]:
+            response_status: int | None = None
+            response_headers: dict[str, str] = {}
+
+            scope = {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "OPTIONS",
+                "scheme": "http",
+                "path": "/auth/admin/login",
+                "raw_path": b"/auth/admin/login",
+                "query_string": b"",
+                "headers": [
+                    (b"origin", b"http://127.0.0.1:5173"),
+                    (b"access-control-request-method", b"POST"),
+                    (b"access-control-request-headers", b"content-type"),
+                ],
+                "client": ("127.0.0.1", 5173),
+                "server": ("127.0.0.1", 8000),
+            }
+
+            async def receive() -> dict[str, object]:
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            async def send(message: dict[str, object]) -> None:
+                nonlocal response_status, response_headers
+                if message["type"] == "http.response.start":
+                    response_status = int(message["status"])
+                    response_headers = {
+                        key.decode("latin-1"): value.decode("latin-1")
+                        for key, value in message["headers"]
+                    }
+
+            await app(scope, receive, send)
+            return response_status, response_headers
+
+        status_code, headers = asyncio.run(exercise_preflight())
+
+        self.assertEqual(status_code, 200)
+        self.assertEqual(headers.get("access-control-allow-origin"), "http://127.0.0.1:5173")
 
 
 if __name__ == "__main__":

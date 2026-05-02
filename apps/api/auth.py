@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.db import EntityStatus, User, UserRole
 
-JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "60"))
 
@@ -79,8 +78,7 @@ def verify_password(password: str, stored_password: str) -> bool:
 
 
 def create_access_token(*, user: User) -> tuple[str, int]:
-    if JWT_ALGORITHM != "HS256":
-        raise RuntimeError(f"unsupported JWT algorithm: {JWT_ALGORITHM}")
+    _validate_auth_settings()
 
     expires_in = JWT_EXPIRES_MINUTES * 60
     payload = {
@@ -177,11 +175,12 @@ def get_current_admin_user(
 
 
 def _encode_jwt(payload: dict[str, Any]) -> str:
+    jwt_secret = _get_jwt_secret()
     header = {"alg": JWT_ALGORITHM, "typ": "JWT"}
     encoded_header = _urlsafe_b64encode(json.dumps(header, separators=(",", ":"), sort_keys=True).encode("utf-8"))
     encoded_payload = _urlsafe_b64encode(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
     signature = hmac.new(
-        JWT_SECRET.encode("utf-8"),
+        jwt_secret.encode("utf-8"),
         f"{encoded_header}.{encoded_payload}".encode("ascii"),
         hashlib.sha256,
     ).digest()
@@ -190,8 +189,8 @@ def _encode_jwt(payload: dict[str, Any]) -> str:
 
 
 def _decode_jwt(token: str) -> dict[str, Any]:
-    if JWT_ALGORITHM != "HS256":
-        raise _unauthorized("Invalid authentication token")
+    _validate_auth_settings()
+    jwt_secret = _get_jwt_secret()
 
     try:
         encoded_header, encoded_payload, encoded_signature = token.split(".")
@@ -200,7 +199,7 @@ def _decode_jwt(token: str) -> dict[str, Any]:
 
     signing_input = f"{encoded_header}.{encoded_payload}".encode("ascii")
     expected_signature = hmac.new(
-        JWT_SECRET.encode("utf-8"),
+        jwt_secret.encode("utf-8"),
         signing_input,
         hashlib.sha256,
     ).digest()
@@ -230,6 +229,19 @@ def _urlsafe_b64encode(value: bytes) -> str:
 def _urlsafe_b64decode(value: str) -> bytes:
     padding = "=" * (-len(value) % 4)
     return base64.urlsafe_b64decode(f"{value}{padding}")
+
+
+def _get_jwt_secret() -> str:
+    jwt_secret = os.getenv("JWT_SECRET")
+    if jwt_secret:
+        return jwt_secret
+    raise RuntimeError("JWT_SECRET is not set")
+
+
+def _validate_auth_settings() -> None:
+    if JWT_ALGORITHM != "HS256":
+        raise RuntimeError(f"unsupported JWT algorithm: {JWT_ALGORITHM}")
+    _get_jwt_secret()
 
 
 def _unauthorized(detail: str) -> HTTPException:
