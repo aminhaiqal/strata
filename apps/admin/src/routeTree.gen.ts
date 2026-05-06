@@ -9,18 +9,72 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UnitsRouteImport } from './routes/units'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as InstallmentPlansRouteImport } from './routes/installment-plans'
+import { Route as ImportsRouteImport } from './routes/imports'
+import { Route as FollowUpsRouteImport } from './routes/follow-ups'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ChargesRouteImport } from './routes/charges'
+import { Route as AuditLogsRouteImport } from './routes/audit-logs'
 import { Route as IndexRouteImport } from './routes/index'
 
+const UnitsRoute = UnitsRouteImport.update({
+  id: '/units',
+  path: '/units',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentsRoute = PaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InstallmentPlansRoute = InstallmentPlansRouteImport.update({
+  id: '/installment-plans',
+  path: '/installment-plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportsRoute = ImportsRouteImport.update({
+  id: '/imports',
+  path: '/imports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FollowUpsRoute = FollowUpsRouteImport.update({
+  id: '/follow-ups',
+  path: '/follow-ups',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChargesRoute = ChargesRouteImport.update({
+  id: '/charges',
+  path: '/charges',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuditLogsRoute = AuditLogsRouteImport.update({
+  id: '/audit-logs',
+  path: '/audit-logs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -31,36 +85,137 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/audit-logs': typeof AuditLogsRoute
+  '/charges': typeof ChargesRoute
   '/dashboard': typeof DashboardRoute
+  '/follow-ups': typeof FollowUpsRoute
+  '/imports': typeof ImportsRoute
+  '/installment-plans': typeof InstallmentPlansRoute
   '/login': typeof LoginRoute
+  '/payments': typeof PaymentsRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
+  '/units': typeof UnitsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/audit-logs': typeof AuditLogsRoute
+  '/charges': typeof ChargesRoute
   '/dashboard': typeof DashboardRoute
+  '/follow-ups': typeof FollowUpsRoute
+  '/imports': typeof ImportsRoute
+  '/installment-plans': typeof InstallmentPlansRoute
   '/login': typeof LoginRoute
+  '/payments': typeof PaymentsRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
+  '/units': typeof UnitsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/audit-logs': typeof AuditLogsRoute
+  '/charges': typeof ChargesRoute
   '/dashboard': typeof DashboardRoute
+  '/follow-ups': typeof FollowUpsRoute
+  '/imports': typeof ImportsRoute
+  '/installment-plans': typeof InstallmentPlansRoute
   '/login': typeof LoginRoute
+  '/payments': typeof PaymentsRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
+  '/units': typeof UnitsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/login'
+  fullPaths:
+    | '/'
+    | '/audit-logs'
+    | '/charges'
+    | '/dashboard'
+    | '/follow-ups'
+    | '/imports'
+    | '/installment-plans'
+    | '/login'
+    | '/payments'
+    | '/reports'
+    | '/settings'
+    | '/units'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/login'
-  id: '__root__' | '/' | '/dashboard' | '/login'
+  to:
+    | '/'
+    | '/audit-logs'
+    | '/charges'
+    | '/dashboard'
+    | '/follow-ups'
+    | '/imports'
+    | '/installment-plans'
+    | '/login'
+    | '/payments'
+    | '/reports'
+    | '/settings'
+    | '/units'
+  id:
+    | '__root__'
+    | '/'
+    | '/audit-logs'
+    | '/charges'
+    | '/dashboard'
+    | '/follow-ups'
+    | '/imports'
+    | '/installment-plans'
+    | '/login'
+    | '/payments'
+    | '/reports'
+    | '/settings'
+    | '/units'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuditLogsRoute: typeof AuditLogsRoute
+  ChargesRoute: typeof ChargesRoute
   DashboardRoute: typeof DashboardRoute
+  FollowUpsRoute: typeof FollowUpsRoute
+  ImportsRoute: typeof ImportsRoute
+  InstallmentPlansRoute: typeof InstallmentPlansRoute
   LoginRoute: typeof LoginRoute
+  PaymentsRoute: typeof PaymentsRoute
+  ReportsRoute: typeof ReportsRoute
+  SettingsRoute: typeof SettingsRoute
+  UnitsRoute: typeof UnitsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/units': {
+      id: '/units'
+      path: '/units'
+      fullPath: '/units'
+      preLoaderRoute: typeof UnitsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payments': {
+      id: '/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof PaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -68,11 +223,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/installment-plans': {
+      id: '/installment-plans'
+      path: '/installment-plans'
+      fullPath: '/installment-plans'
+      preLoaderRoute: typeof InstallmentPlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/imports': {
+      id: '/imports'
+      path: '/imports'
+      fullPath: '/imports'
+      preLoaderRoute: typeof ImportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/follow-ups': {
+      id: '/follow-ups'
+      path: '/follow-ups'
+      fullPath: '/follow-ups'
+      preLoaderRoute: typeof FollowUpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/charges': {
+      id: '/charges'
+      path: '/charges'
+      fullPath: '/charges'
+      preLoaderRoute: typeof ChargesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/audit-logs': {
+      id: '/audit-logs'
+      path: '/audit-logs'
+      fullPath: '/audit-logs'
+      preLoaderRoute: typeof AuditLogsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -87,8 +277,17 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuditLogsRoute: AuditLogsRoute,
+  ChargesRoute: ChargesRoute,
   DashboardRoute: DashboardRoute,
+  FollowUpsRoute: FollowUpsRoute,
+  ImportsRoute: ImportsRoute,
+  InstallmentPlansRoute: InstallmentPlansRoute,
   LoginRoute: LoginRoute,
+  PaymentsRoute: PaymentsRoute,
+  ReportsRoute: ReportsRoute,
+  SettingsRoute: SettingsRoute,
+  UnitsRoute: UnitsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
