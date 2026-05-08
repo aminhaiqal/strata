@@ -1,3 +1,6 @@
+import { useRouter } from "@tanstack/react-router"
+
+import { clearAdminSession } from "@/lib/auth"
 import {
   Avatar,
   AvatarFallback,
@@ -34,15 +37,23 @@ export function NavUser({
     name: string
     email: string
     avatar: string
+    role?: string
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
   const fallback = user.name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((value) => value[0]?.toUpperCase())
     .join("")
+
+  async function handleLogout() {
+    clearAdminSession()
+    await router.invalidate()
+    await router.navigate({ to: "/login" })
+  }
 
   return (
     <SidebarMenu>
@@ -92,7 +103,7 @@ export function NavUser({
               <DropdownMenuItem>
                 <ShieldCheckIcon
                 />
-                Role & access
+                {user.role ? `Role: ${user.role}` : "Role & access"}
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <BellIcon
@@ -106,7 +117,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOutIcon
               />
               Log out

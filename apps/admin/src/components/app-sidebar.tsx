@@ -2,6 +2,10 @@
 
 import type { ComponentProps } from "react"
 
+import { Building2Icon } from "lucide-react"
+
+import { readStoredAdminSession } from "@/lib/auth"
+import { adminNavigation } from "@/lib/admin-navigation"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { TeamSwitcher } from "@/components/team-switcher"
@@ -12,25 +16,9 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { Building2Icon } from "lucide-react"
-import { adminNavigation } from "@/lib/admin-navigation"
-
-const data = {
-  user: {
-    name: "Residence Admin",
-    email: "admin@axelyn.strata",
-    avatar: "",
-  },
-  teams: [
-    {
-      name: "Axelyn Strata",
-      logo: <Building2Icon />,
-      plan: "Admin Console",
-    },
-  ],
-}
 
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
+  const session = readStoredAdminSession()
   const items = adminNavigation.map((item) => ({
     title: item.title,
     url: item.url,
@@ -41,17 +29,36 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       url: subItem.url,
     })),
   }))
+  const user = session?.user ?? {
+    name: "Residence Admin",
+    email: "admin@example.com",
+    role: "Role & access",
+  }
+  const teams = [
+    {
+      name: "Strata",
+      logo: <Building2Icon />,
+      plan: "Admin Console",
+    },
+  ]
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={teams} />
       </SidebarHeader>
       <SidebarContent>
         <NavMain label="Finance Operations" items={items} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser
+          user={{
+            name: user.name,
+            email: user.email,
+            avatar: "",
+            role: user.role,
+          }}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
