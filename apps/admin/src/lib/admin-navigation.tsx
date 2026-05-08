@@ -49,13 +49,13 @@ export const adminNavigation: AdminNavSection[] = [
     slug: "residences",
     url: "/dashboard/residences",
     icon: Building2Icon,
-    badge: "Super",
+    badge: "Admin",
     description:
-      "Manage residence structure, from communities and blocks down to units and assigned administrators.",
+      "Manage the residence structure available to the signed-in admin, from residence settings and blocks down to unit records.",
     capabilities: [
-      "Create and update residences with operational settings.",
+      "Update residence settings within the current admin scope.",
       "Organize blocks and buildings under each residence.",
-      "Maintain unit records and residence admin access.",
+      "Maintain unit records directly from the admin console.",
     ],
     items: [
       {
@@ -63,11 +63,11 @@ export const adminNavigation: AdminNavSection[] = [
         slug: "directory",
         url: "/dashboard/residences/directory",
         description:
-          "Create residences, review their status, and keep community-level profile data accurate.",
+          "Review and update the current residence profile, billing cycle, timezone, and operational status.",
         capabilities: [
           "Track name, address, timezone, and currency.",
           "Review residence status and billing cycle configuration.",
-          "Prepare multi-residence operations for super admins.",
+          "Keep the active residence profile accurate for operations.",
         ],
       },
       {
@@ -75,10 +75,10 @@ export const adminNavigation: AdminNavSection[] = [
         slug: "blocks-buildings",
         url: "/dashboard/residences/blocks-buildings",
         description:
-          "Define the physical structure inside each residence so units are grouped consistently.",
+          "Define and maintain the physical structure inside the current residence so units are grouped consistently.",
         capabilities: [
           "Create block and tower records.",
-          "Store descriptions for building-level context.",
+          "Edit descriptions for building-level context.",
           "Support unit uniqueness within block and residence scope.",
         ],
       },
@@ -92,18 +92,6 @@ export const adminNavigation: AdminNavSection[] = [
           "Create and edit unit records.",
           "Capture owner and tenant contact details.",
           "Monitor occupancy and unit lifecycle status.",
-        ],
-      },
-      {
-        title: "Residence admins",
-        slug: "admins",
-        url: "/dashboard/residences/admins",
-        description:
-          "Assign administrative access to each residence and separate super admin from residence-level responsibilities.",
-        capabilities: [
-          "Manage residence admin assignments.",
-          "Restrict system-level access to super admins.",
-          "Review role coverage across communities.",
         ],
       },
     ],
@@ -503,4 +491,3 @@ export function getAdminSubsection(sectionSlug: string, subsectionSlug: string) 
     (item) => item.slug === subsectionSlug
   )
 }
-

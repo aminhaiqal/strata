@@ -1,9 +1,10 @@
-import { Link, useParams } from "@tanstack/react-router"
-import { ArrowRightIcon } from "lucide-react"
+import { useParams } from "@tanstack/react-router"
 
 import { ArrearsReportScreen } from "@/components/admin/arrears-report-screen"
+import { BlocksScreen } from "@/components/admin/blocks-screen"
 import { ChargesScreen } from "@/components/admin/charges-screen"
 import { PendingVerificationScreen } from "@/components/admin/pending-verification-screen"
+import { ResidencesScreen } from "@/components/admin/residences-screen"
 import { UnitsScreen } from "@/components/admin/units-screen"
 import { AdminShell } from "@/components/admin-shell"
 import {
@@ -14,12 +15,13 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  adminNavigation,
   getAdminSection,
   getAdminSubsection,
 } from "@/lib/admin-navigation"
 
 const detailedScreenMap = {
+  "residences/directory": ResidencesScreen,
+  "residences/blocks-buildings": BlocksScreen,
   "residences/units": UnitsScreen,
   "billing/charges": ChargesScreen,
   "collections/pending-verification": PendingVerificationScreen,
@@ -117,83 +119,6 @@ export default function AdminSectionPage() {
       </div>
         </>
       ) : null}
-
-      {currentSection.items?.length ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {currentSubsection ? "Related screens" : "Available screens"}
-            </CardTitle>
-            <CardDescription>
-              {currentSubsection
-                ? "Jump to adjacent workflows inside the same admin section."
-                : "Each screen maps to a requirement-backed area of the administrator interface."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              {currentSection.items.map((item) => (
-                <Link
-                  key={item.slug}
-                  to={item.url}
-                  className="group rounded-xl border border-border/70 bg-card transition-colors hover:border-foreground/20"
-                >
-                  <div className="flex h-full flex-col gap-3 p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h2 className="text-sm font-semibold">{item.title}</h2>
-                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                          {item.description}
-                        </p>
-                      </div>
-                      <ArrowRightIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-                    </div>
-                    <div className="space-y-2 border-t border-border/60 pt-3">
-                      {item.capabilities.slice(0, 2).map((capability) => (
-                        <p
-                          key={capability}
-                          className="text-xs leading-5 text-muted-foreground"
-                        >
-                          {capability}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Other admin areas</CardTitle>
-          <CardDescription>
-            High-level navigation across the rest of the finance operations console.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {adminNavigation
-              .filter((item) => item.slug !== currentSection.slug)
-              .map((item) => (
-                <Link
-                  key={item.slug}
-                  to={item.url}
-                  className="rounded-xl border border-border/70 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
-                >
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {item.description}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
     </AdminShell>
   )
 }

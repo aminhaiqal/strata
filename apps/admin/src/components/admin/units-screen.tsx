@@ -1,24 +1,21 @@
 import {
+  useEffect,
   useState,
-  type ChangeEvent,
-  type ComponentProps,
   type FormEvent,
 } from "react"
+import { useRouter } from "@tanstack/react-router"
 import {
-  DownloadIcon,
-  FileSpreadsheetIcon,
-  FilterIcon,
+  Building2Icon,
   HomeIcon,
   PlusIcon,
-  UploadIcon,
   UsersIcon,
 } from "lucide-react"
 
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+  UnauthorizedApiError,
+  adminApiJson,
+} from "@/lib/auth"
+import { AdminSelect } from "@/components/admin/admin-select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -44,27 +41,46 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  formatTimestamp,
+  getErrorMessage,
+} from "@/lib/admin-screen-utils"
 
-type UnitRecord = {
-  unitNumber: string
-  block: string
-  type: string
-  owner: string
-  tenant: string
-  occupancy: string
-  status: string
-  classification: string
-  outstanding: string
-  phone: string
-  email: string
-  updatedAt: string
+type BlockRecord = {
+  id: number
+  residence_id: number
+  name: string
+  description: string | null
+  created_at: string
+  updated_at: string
 }
 
-type AddUnitFormState = {
+type UnitStatus = "active" | "inactive"
+
+type UnitRecord = {
+  id: number
+  residence_id: number
+  block_id: number
+  unit_number: string
+  floor: string | null
+  unit_type: string | null
+  owner_name: string | null
+  owner_phone: string | null
+  owner_email: string | null
+  tenant_name: string | null
+  tenant_phone: string | null
+  tenant_email: string | null
+  is_occupied: boolean
+  status: UnitStatus
+  created_at: string
+  updated_at: string
+}
+
+type UnitFormState = {
+  blockId: string
   unitNumber: string
-  block: string
   floor: string
   unitType: string
   ownerName: string
@@ -73,99 +89,20 @@ type AddUnitFormState = {
   tenantName: string
   tenantPhone: string
   tenantEmail: string
-  isOccupied: string
-  status: string
+  isOccupied: "true" | "false"
+  status: UnitStatus
 }
 
-type ImportBatchState = {
-  fileName: string
-  source: string
-  queuedAt: string
+type UnitFilters = {
+  search: string
+  blockId: string
+  status: "all" | UnitStatus
+  occupancy: "all" | "true" | "false"
 }
 
-const metrics = [
-  {
-    title: "Active units",
-    value: "412",
-    detail: "18 newly onboarded after the April import batch.",
-    icon: HomeIcon,
-  },
-  {
-    title: "Occupied",
-    value: "365",
-    detail: "Owner and tenant occupancy records are up to date for 89%.",
-    icon: UsersIcon,
-  },
-  {
-    title: "Needs review",
-    value: "21",
-    detail: "Units missing owner or tenant contacts before billing notices.",
-    icon: FilterIcon,
-  },
-]
-
-const initialUnits: UnitRecord[] = [
-  {
-    unitNumber: "A-12-03",
-    block: "Tower A",
-    type: "Type B1",
-    owner: "Nur Aisyah",
-    tenant: "Vacant",
-    occupancy: "Owner occupied",
-    status: "active",
-    classification: "healthy",
-    outstanding: "RM 0.00",
-    phone: "+60 12-338 9012",
-    email: "nur.aisyah@example.com",
-    updatedAt: "Updated 2 hours ago",
-  },
-  {
-    unitNumber: "B-08-11",
-    block: "Tower B",
-    type: "Type C2",
-    owner: "Daniel Lim",
-    tenant: "Chloe Tan",
-    occupancy: "Tenanted",
-    status: "active",
-    classification: "pending_verification",
-    outstanding: "RM 1,240.00",
-    phone: "+60 19-447 1208",
-    email: "daniel.lim@example.com",
-    updatedAt: "Updated after payment proof submission",
-  },
-  {
-    unitNumber: "C-03-02",
-    block: "Tower C",
-    type: "Studio",
-    owner: "Yap Wei Ming",
-    tenant: "Vacant",
-    occupancy: "Vacant",
-    status: "maintenance_hold",
-    classification: "under_review",
-    outstanding: "RM 420.00",
-    phone: "+60 18-552 1890",
-    email: "wm.yap@example.com",
-    updatedAt: "Missing meter verification before reactivation",
-  },
-  {
-    unitNumber: "A-15-07",
-    block: "Tower A",
-    type: "Type D",
-    owner: "Siti Khatijah",
-    tenant: "Hafiz Jamal",
-    occupancy: "Tenanted",
-    status: "active",
-    classification: "on_installment",
-    outstanding: "RM 4,880.00",
-    phone: "+60 16-662 4117",
-    email: "siti.khatijah@example.com",
-    updatedAt: "Installment plan active until July 2026",
-  },
-]
-
-const defaultFormState: AddUnitFormState = {
+const defaultFormState: UnitFormState = {
+  blockId: "",
   unitNumber: "",
-  block: "",
   floor: "",
   unitType: "",
   ownerName: "",
@@ -178,224 +115,370 @@ const defaultFormState: AddUnitFormState = {
   status: "active",
 }
 
-const importSourceOptions = [
-  "Excel CSV export",
-  "Google Sheets CSV download",
-  "Legacy finance sheet CSV",
-]
-
-const requiredImportColumns = [
-  "block_name",
-  "unit_number",
-  "floor",
-  "unit_type",
-  "owner_name",
-  "owner_phone",
-  "owner_email",
-  "tenant_name",
-  "tenant_phone",
-  "tenant_email",
-  "is_occupied",
-  "status",
-]
-
-function unitStatusVariant(status: string) {
-  if (status === "active") {
-    return "success"
-  }
-
-  if (status === "maintenance_hold") {
-    return "warning"
-  }
-
-  return "outline"
+const defaultFilters: UnitFilters = {
+  search: "",
+  blockId: "",
+  status: "all",
+  occupancy: "all",
 }
 
-function classificationVariant(classification: string) {
-  if (classification === "healthy") {
+function toOptionalString(value: string): string | null {
+  const trimmedValue = value.trim()
+  return trimmedValue ? trimmedValue : null
+}
+
+function buildUnitPayload(form: UnitFormState) {
+  return {
+    block_id: Number(form.blockId),
+    unit_number: form.unitNumber.trim(),
+    floor: toOptionalString(form.floor),
+    unit_type: toOptionalString(form.unitType),
+    owner_name: toOptionalString(form.ownerName),
+    owner_phone: toOptionalString(form.ownerPhone),
+    owner_email: toOptionalString(form.ownerEmail),
+    tenant_name: toOptionalString(form.tenantName),
+    tenant_phone: toOptionalString(form.tenantPhone),
+    tenant_email: toOptionalString(form.tenantEmail),
+    is_occupied: form.isOccupied === "true",
+    status: form.status,
+  }
+}
+
+function unitToForm(unit: UnitRecord): UnitFormState {
+  return {
+    blockId: String(unit.block_id),
+    unitNumber: unit.unit_number,
+    floor: unit.floor ?? "",
+    unitType: unit.unit_type ?? "",
+    ownerName: unit.owner_name ?? "",
+    ownerPhone: unit.owner_phone ?? "",
+    ownerEmail: unit.owner_email ?? "",
+    tenantName: unit.tenant_name ?? "",
+    tenantPhone: unit.tenant_phone ?? "",
+    tenantEmail: unit.tenant_email ?? "",
+    isOccupied: unit.is_occupied ? "true" : "false",
+    status: unit.status,
+  }
+}
+
+function unitStatusVariant(status: UnitStatus) {
+  if (status === "active") {
     return "success"
-  }
-
-  if (classification === "pending_verification") {
-    return "warning"
-  }
-
-  if (classification === "under_review") {
-    return "destructive"
   }
 
   return "secondary"
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("")
+function occupancyVariant(isOccupied: boolean) {
+  return isOccupied ? "default" : "outline"
 }
 
-function getOccupancyLabel(form: AddUnitFormState) {
-  if (form.isOccupied !== "true") {
+function getOccupancyLabel(unit: Pick<UnitRecord, "is_occupied" | "tenant_name">) {
+  if (!unit.is_occupied) {
     return "Vacant"
   }
 
-  if (form.tenantName.trim()) {
-    return "Tenanted"
-  }
-
-  return "Owner occupied"
-}
-
-function getClassification(status: string) {
-  if (status === "active") {
-    return "healthy"
-  }
-
-  return "under_review"
-}
-
-function buildUnitRecord(form: AddUnitFormState): UnitRecord {
-  return {
-    unitNumber: form.unitNumber.trim(),
-    block: form.block.trim(),
-    type: form.unitType.trim() || "Standard",
-    owner: form.ownerName.trim(),
-    tenant: form.tenantName.trim() || "Vacant",
-    occupancy: getOccupancyLabel(form),
-    status: form.status,
-    classification: getClassification(form.status),
-    outstanding: "RM 0.00",
-    phone: form.ownerPhone.trim() || "Not provided",
-    email: form.ownerEmail.trim() || "Not provided",
-    updatedAt: "Added just now",
-  }
-}
-
-function Select(props: ComponentProps<"select">) {
-  return (
-    <select
-      data-slot="select"
-      className="h-9 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-      {...props}
-    />
-  )
+  return unit.tenant_name ? "Tenanted" : "Occupied"
 }
 
 export function UnitsScreen() {
-  const [units, setUnits] = useState(initialUnits)
-  const [isAddUnitOpen, setIsAddUnitOpen] = useState(false)
-  const [isImportOpen, setIsImportOpen] = useState(false)
+  const router = useRouter()
+  const [blocks, setBlocks] = useState<BlockRecord[]>([])
+  const [units, setUnits] = useState<UnitRecord[]>([])
+  const [filters, setFilters] = useState(defaultFilters)
+  const [isLoadingBlocks, setIsLoadingBlocks] = useState(true)
+  const [isLoadingUnits, setIsLoadingUnits] = useState(true)
+  const [blocksError, setBlocksError] = useState<string | null>(null)
+  const [unitsError, setUnitsError] = useState<string | null>(null)
+  const [refreshUnitsKey, setRefreshUnitsKey] = useState(0)
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [sheetMode, setSheetMode] = useState<"create" | "edit">("create")
+  const [editingUnitId, setEditingUnitId] = useState<number | null>(null)
+  const [isLoadingUnitDetail, setIsLoadingUnitDetail] = useState(false)
   const [form, setForm] = useState(defaultFormState)
-  const [importSource, setImportSource] = useState(importSourceOptions[0])
-  const [importFileName, setImportFileName] = useState("")
-  const [blocksReady, setBlocksReady] = useState("yes")
-  const [latestImportBatch, setLatestImportBatch] =
-    useState<ImportBatchState | null>(null)
-  const [importInputKey, setImportInputKey] = useState(0)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitNotice, setSubmitNotice] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleOpenChange(open: boolean) {
-    setIsAddUnitOpen(open)
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadBlocks() {
+      setIsLoadingBlocks(true)
+      setBlocksError(null)
+
+      try {
+        const nextBlocks = await adminApiJson<BlockRecord[]>("/admin/blocks")
+
+        if (cancelled) {
+          return
+        }
+
+        setBlocks(nextBlocks)
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+
+        if (error instanceof UnauthorizedApiError) {
+          await router.invalidate()
+          await router.navigate({ to: "/login" })
+          return
+        }
+
+        setBlocksError(
+          getErrorMessage(error, "Unable to load blocks for this residence."),
+        )
+      } finally {
+        if (!cancelled) {
+          setIsLoadingBlocks(false)
+        }
+      }
+    }
+
+    void loadBlocks()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadUnits() {
+      setIsLoadingUnits(true)
+      setUnitsError(null)
+
+      const params = new URLSearchParams()
+
+      if (filters.search.trim()) {
+        params.set("search", filters.search.trim())
+      }
+
+      if (filters.blockId) {
+        params.set("block_id", filters.blockId)
+      }
+
+      if (filters.status !== "all") {
+        params.set("status", filters.status)
+      }
+
+      if (filters.occupancy !== "all") {
+        params.set("is_occupied", filters.occupancy)
+      }
+
+      const path = params.size ? `/admin/units?${params.toString()}` : "/admin/units"
+
+      try {
+        const nextUnits = await adminApiJson<UnitRecord[]>(path)
+
+        if (cancelled) {
+          return
+        }
+
+        setUnits(nextUnits)
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+
+        if (error instanceof UnauthorizedApiError) {
+          await router.invalidate()
+          await router.navigate({ to: "/login" })
+          return
+        }
+
+        setUnitsError(
+          getErrorMessage(error, "Unable to load units for this residence."),
+        )
+      } finally {
+        if (!cancelled) {
+          setIsLoadingUnits(false)
+        }
+      }
+    }
+
+    void loadUnits()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    filters.blockId,
+    filters.occupancy,
+    filters.search,
+    filters.status,
+    refreshUnitsKey,
+    router,
+  ])
+
+  function resetSheetState() {
+    setForm(defaultFormState)
+    setSubmitError(null)
+    setEditingUnitId(null)
+    setIsLoadingUnitDetail(false)
+    setIsSubmitting(false)
+    setSheetMode("create")
+  }
+
+  function handleSheetOpenChange(open: boolean) {
+    setIsSheetOpen(open)
 
     if (!open) {
-      setForm(defaultFormState)
+      resetSheetState()
     }
   }
 
-  function handleImportOpenChange(open: boolean) {
-    setIsImportOpen(open)
-
-    if (!open) {
-      setImportSource(importSourceOptions[0])
-      setImportFileName("")
-      setBlocksReady("yes")
-      setImportInputKey((current) => current + 1)
-    }
-  }
-
-  function updateForm<K extends keyof AddUnitFormState>(
+  function updateForm<K extends keyof UnitFormState>(
     key: K,
-    value: AddUnitFormState[K]
+    value: UnitFormState[K],
   ) {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setUnits((current) => [buildUnitRecord(form), ...current])
+  function updateFilter<K extends keyof UnitFilters>(
+    key: K,
+    value: UnitFilters[K],
+  ) {
+    setFilters((current) => ({ ...current, [key]: value }))
+  }
+
+  function openCreateSheet() {
+    setSubmitNotice(null)
+    setSheetMode("create")
     setForm(defaultFormState)
-    setIsAddUnitOpen(false)
+    setSubmitError(null)
+    setEditingUnitId(null)
+    setIsSheetOpen(true)
   }
 
-  function handleImportFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setImportFileName(event.target.files?.[0]?.name ?? "")
-  }
+  async function openEditSheet(unitId: number) {
+    setSubmitNotice(null)
+    setSheetMode("edit")
+    setEditingUnitId(unitId)
+    setSubmitError(null)
+    setIsLoadingUnitDetail(true)
+    setIsSheetOpen(true)
 
-  function handleImportSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+    try {
+      const unit = await adminApiJson<UnitRecord>(`/admin/units/${unitId}`)
+      setForm(unitToForm(unit))
+    } catch (error) {
+      if (error instanceof UnauthorizedApiError) {
+        await router.invalidate()
+        await router.navigate({ to: "/login" })
+        return
+      }
 
-    if (!importFileName || blocksReady !== "yes") {
-      return
+      setSubmitError(
+        getErrorMessage(error, "Unable to load this unit for editing."),
+      )
+    } finally {
+      setIsLoadingUnitDetail(false)
     }
-
-    setLatestImportBatch({
-      fileName: importFileName,
-      source: importSource,
-      queuedAt: "Queued just now",
-    })
-    handleImportOpenChange(false)
   }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitError(null)
+    setSubmitNotice(null)
+    setIsSubmitting(true)
+
+    try {
+      if (sheetMode === "edit" && editingUnitId !== null) {
+        await adminApiJson<UnitRecord>(`/admin/units/${editingUnitId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(buildUnitPayload(form)),
+        })
+        setSubmitNotice(`Unit ${form.unitNumber.trim()} updated.`)
+      } else {
+        await adminApiJson<UnitRecord>("/admin/units", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(buildUnitPayload(form)),
+        })
+        setSubmitNotice(`Unit ${form.unitNumber.trim()} created.`)
+      }
+
+      handleSheetOpenChange(false)
+      setRefreshUnitsKey((current) => current + 1)
+    } catch (error) {
+      if (error instanceof UnauthorizedApiError) {
+        await router.invalidate()
+        await router.navigate({ to: "/login" })
+        return
+      }
+
+      setSubmitError(
+        getErrorMessage(error, "Unable to save this unit right now."),
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  function getBlockName(blockId: number): string {
+    return blocks.find((block) => block.id === blockId)?.name ?? `Block #${blockId}`
+  }
+
+  const activeUnitsCount = units.filter((unit) => unit.status === "active").length
+  const occupiedUnitsCount = units.filter((unit) => unit.is_occupied).length
+  const vacantUnitsCount = units.length - occupiedUnitsCount
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
-        {metrics.map((metric) => {
-          const Icon = metric.icon
-
-          return (
-            <Card key={metric.title}>
-              <CardHeader>
-                <CardDescription>{metric.title}</CardDescription>
-                <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="text-3xl font-semibold">
-                    {metric.value}
-                  </CardTitle>
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
-                    <Icon className="size-4" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {metric.detail}
-                </p>
-              </CardContent>
-            </Card>
-          )
-        })}
+        <Card>
+          <CardHeader>
+            <CardDescription>Visible units</CardDescription>
+            <div className="flex items-start justify-between gap-3">
+              <CardTitle className="text-3xl font-semibold">
+                {isLoadingUnits ? "--" : units.length}
+              </CardTitle>
+              <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
+                <HomeIcon className="size-4" />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Active units</CardDescription>
+            <div className="flex items-start justify-between gap-3">
+              <CardTitle className="text-3xl font-semibold">
+                {isLoadingUnits ? "--" : activeUnitsCount}
+              </CardTitle>
+              <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
+                <Building2Icon className="size-4" />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Occupied units</CardDescription>
+            <div className="flex items-start justify-between gap-3">
+              <CardTitle className="text-3xl font-semibold">
+                {isLoadingUnits ? "--" : occupiedUnitsCount}
+              </CardTitle>
+              <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
+                <UsersIcon className="size-4" />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
       </div>
 
-      {latestImportBatch ? (
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileSpreadsheetIcon className="size-4" />
-              Import batch ready
-            </CardTitle>
-            <CardDescription>
-              The UI is prepared for CSV unit import. Wire this submission to
-              `POST /admin/imports/units` next.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-            <div className="space-y-1">
-              <p className="font-medium text-foreground">
-                {latestImportBatch.fileName}
-              </p>
-              <p>{latestImportBatch.source}</p>
-            </div>
-            <Badge variant="secondary">{latestImportBatch.queuedAt}</Badge>
+      {submitNotice ? (
+        <Card className="border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20">
+          <CardContent className="py-4 text-sm text-emerald-800 dark:text-emerald-300">
+            {submitNotice}
           </CardContent>
         </Card>
       ) : null}
@@ -405,552 +488,504 @@ export function UnitsScreen() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <CardTitle>Unit registry</CardTitle>
-              <CardDescription>
-                Maintain unit identity, ownership, occupancy, and collection
-                context before charges and follow-ups are applied.
-              </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Sheet open={isImportOpen} onOpenChange={handleImportOpenChange}>
-                <SheetTrigger asChild>
-                  <Button variant="outline">
-                    <DownloadIcon />
-                    Import units
-                  </Button>
-                </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-2xl">
-                  <SheetHeader>
-                    <SheetTitle>Import units</SheetTitle>
-                    <SheetDescription>
-                      Upload a CSV exported from Excel or Google Sheets to
-                      create units in bulk.
-                    </SheetDescription>
-                  </SheetHeader>
-
-                  <form
-                    className="flex h-full flex-col"
-                    onSubmit={handleImportSubmit}
-                  >
-                    <div className="flex-1 space-y-6 overflow-y-auto px-4 pb-4">
-                      <div className="grid gap-4 md:grid-cols-3">
-                        {[
-                          "Export the current unit sheet as CSV.",
-                          "Make sure blocks already exist in this residence.",
-                          "Review row-level errors before re-uploading.",
-                        ].map((item) => (
-                          <div
-                            key={item}
-                            className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm leading-6 text-muted-foreground"
-                          >
-                            {item}
-                          </div>
-                        ))}
-                      </div>
-
-                      <FieldGroup className="grid gap-4 md:grid-cols-2">
-                        <Field>
-                          <FieldLabel htmlFor="import-source">Source</FieldLabel>
-                          <FieldContent>
-                            <Select
-                              id="import-source"
-                              value={importSource}
-                              onChange={(event) =>
-                                setImportSource(event.target.value)
-                              }
-                            >
-                              {importSourceOptions.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </Select>
-                            <FieldDescription>
-                              Import from a CSV produced by the team&apos;s
-                              existing spreadsheet workflow.
-                            </FieldDescription>
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor="blocks-ready">
-                            Blocks already created
-                          </FieldLabel>
-                          <FieldContent>
-                            <Select
-                              id="blocks-ready"
-                              value={blocksReady}
-                              onChange={(event) =>
-                                setBlocksReady(event.target.value)
-                              }
-                            >
-                              <option value="yes">Yes, blocks exist</option>
-                              <option value="no">No, create blocks first</option>
-                            </Select>
-                            <FieldDescription>
-                              The current API requires `block_name` values to
-                              match existing blocks.
-                            </FieldDescription>
-                          </FieldContent>
-                        </Field>
-                      </FieldGroup>
-
-                      <Field>
-                        <FieldLabel htmlFor="units-csv">CSV file</FieldLabel>
-                        <FieldContent>
-                          <Input
-                            key={importInputKey}
-                            id="units-csv"
-                            type="file"
-                            accept=".csv,text/csv"
-                            onChange={handleImportFileChange}
-                            required
-                          />
-                          <FieldDescription>
-                            {importFileName
-                              ? `Selected file: ${importFileName}`
-                              : "Accepted format: .csv"}
-                          </FieldDescription>
-                        </FieldContent>
-                      </Field>
-
-                      <Separator />
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base">
-                            Required columns
-                          </CardTitle>
-                          <CardDescription>
-                            Match the current backend contract exactly for the
-                            first MVP import flow.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid gap-2 sm:grid-cols-2">
-                          {requiredImportColumns.map((column) => (
-                            <div
-                              key={column}
-                              className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm font-mono"
-                            >
-                              {column}
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base">
-                            Import result to expect
-                          </CardTitle>
-                          <CardDescription>
-                            The backend processes unit imports synchronously and
-                            returns success and failure row counts.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm leading-6 text-muted-foreground">
-                          <p>
-                            Successful rows create units immediately in the
-                            current residence.
-                          </p>
-                          <p>
-                            Invalid rows should come back with row-level
-                            validation errors for correction.
-                          </p>
-                          <p>
-                            Unknown block names should fail until the matching
-                            block records exist.
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    <SheetFooter className="border-t border-border/70 bg-background">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleImportOpenChange(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={!importFileName || blocksReady !== "yes"}
-                      >
-                        <UploadIcon />
-                        Queue import
-                      </Button>
-                    </SheetFooter>
-                  </form>
-                </SheetContent>
-              </Sheet>
-              <Sheet open={isAddUnitOpen} onOpenChange={handleOpenChange}>
-                <SheetTrigger asChild>
-                  <Button>
-                    <PlusIcon />
-                    Add unit
-                  </Button>
-                </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-2xl">
-                  <SheetHeader>
-                    <SheetTitle>Add unit</SheetTitle>
-                    <SheetDescription>
-                      Create a unit record with the minimum ownership and
-                      occupancy context needed before billing starts.
-                    </SheetDescription>
-                  </SheetHeader>
-
-                  <form
-                    className="flex h-full flex-col"
-                    onSubmit={handleSubmit}
-                  >
-                    <div className="flex-1 space-y-6 overflow-y-auto px-4 pb-4">
-                      <FieldGroup className="grid gap-4 md:grid-cols-2">
-                        <Field>
-                          <FieldLabel htmlFor="unit-number">Unit number</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="unit-number"
-                              value={form.unitNumber}
-                              onChange={(event) =>
-                                updateForm("unitNumber", event.target.value)
-                              }
-                              placeholder="A-10-01"
-                              required
-                            />
-                            <FieldDescription>
-                              Keep unit numbers unique within the selected block.
-                            </FieldDescription>
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor="block-name">Block or building</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="block-name"
-                              value={form.block}
-                              onChange={(event) =>
-                                updateForm("block", event.target.value)
-                              }
-                              placeholder="Tower A"
-                              required
-                            />
-                            <FieldDescription>
-                              Match the naming used in your billing and import data.
-                            </FieldDescription>
-                          </FieldContent>
-                        </Field>
-                      </FieldGroup>
-
-                      <FieldGroup className="grid gap-4 md:grid-cols-3">
-                        <Field>
-                          <FieldLabel htmlFor="floor">Floor</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="floor"
-                              value={form.floor}
-                              onChange={(event) =>
-                                updateForm("floor", event.target.value)
-                              }
-                              placeholder="10"
-                            />
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor="unit-type">Unit type</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="unit-type"
-                              value={form.unitType}
-                              onChange={(event) =>
-                                updateForm("unitType", event.target.value)
-                              }
-                              placeholder="Type B1"
-                            />
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor="occupancy-status">Occupancy</FieldLabel>
-                          <FieldContent>
-                            <Select
-                              id="occupancy-status"
-                              value={form.isOccupied}
-                              onChange={(event) =>
-                                updateForm("isOccupied", event.target.value)
-                              }
-                            >
-                              <option value="true">Occupied</option>
-                              <option value="false">Vacant</option>
-                            </Select>
-                          </FieldContent>
-                        </Field>
-                      </FieldGroup>
-
-                      <FieldGroup className="grid gap-4 md:grid-cols-2">
-                        <Field>
-                          <FieldLabel htmlFor="owner-name">Owner name</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="owner-name"
-                              value={form.ownerName}
-                              onChange={(event) =>
-                                updateForm("ownerName", event.target.value)
-                              }
-                              placeholder="Nur Aisyah"
-                              required
-                            />
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor="owner-email">Owner email</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="owner-email"
-                              type="email"
-                              value={form.ownerEmail}
-                              onChange={(event) =>
-                                updateForm("ownerEmail", event.target.value)
-                              }
-                              placeholder="owner@example.com"
-                            />
-                          </FieldContent>
-                        </Field>
-                      </FieldGroup>
-
-                      <FieldGroup className="grid gap-4 md:grid-cols-2">
-                        <Field>
-                          <FieldLabel htmlFor="owner-phone">Owner phone</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="owner-phone"
-                              value={form.ownerPhone}
-                              onChange={(event) =>
-                                updateForm("ownerPhone", event.target.value)
-                              }
-                              placeholder="+60 12-345 6789"
-                            />
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor="unit-status">Unit status</FieldLabel>
-                          <FieldContent>
-                            <Select
-                              id="unit-status"
-                              value={form.status}
-                              onChange={(event) =>
-                                updateForm("status", event.target.value)
-                              }
-                            >
-                              <option value="active">Active</option>
-                              <option value="inactive">Inactive</option>
-                              <option value="maintenance_hold">
-                                Maintenance hold
-                              </option>
-                            </Select>
-                          </FieldContent>
-                        </Field>
-                      </FieldGroup>
-
-                      <Separator />
-
-                      <FieldGroup className="grid gap-4 md:grid-cols-2">
-                        <Field>
-                          <FieldLabel htmlFor="tenant-name">Tenant name</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="tenant-name"
-                              value={form.tenantName}
-                              onChange={(event) =>
-                                updateForm("tenantName", event.target.value)
-                              }
-                              placeholder="Optional"
-                            />
-                            <FieldDescription>
-                              Leave blank for owner-occupied or vacant units.
-                            </FieldDescription>
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor="tenant-email">Tenant email</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id="tenant-email"
-                              type="email"
-                              value={form.tenantEmail}
-                              onChange={(event) =>
-                                updateForm("tenantEmail", event.target.value)
-                              }
-                              placeholder="tenant@example.com"
-                            />
-                          </FieldContent>
-                        </Field>
-                      </FieldGroup>
-
-                      <Field>
-                        <FieldLabel htmlFor="tenant-phone">Tenant phone</FieldLabel>
-                        <FieldContent>
-                          <Input
-                            id="tenant-phone"
-                            value={form.tenantPhone}
-                            onChange={(event) =>
-                              updateForm("tenantPhone", event.target.value)
-                            }
-                            placeholder="+60 19-222 3344"
-                          />
-                        </FieldContent>
-                      </Field>
-                    </div>
-
-                    <SheetFooter className="border-t border-border/70 bg-background">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsAddUnitOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit">Create unit</Button>
-                    </SheetFooter>
-                  </form>
-                </SheetContent>
-              </Sheet>
-            </div>
+            <Button
+              onClick={openCreateSheet}
+              disabled={isLoadingBlocks}
+            >
+              <PlusIcon />
+              Add unit
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <FieldGroup className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
+          <FieldGroup className="grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_repeat(3,minmax(0,1fr))]">
             <Field>
-              <FieldLabel>Search unit or owner</FieldLabel>
+              <FieldLabel htmlFor="unit-search">Search</FieldLabel>
               <FieldContent>
-                <Input placeholder="A-12-03, Daniel Lim, Tower B" />
+                <Input
+                  id="unit-search"
+                  value={filters.search}
+                  onChange={(event) => updateFilter("search", event.target.value)}
+                  placeholder="A-10-01, Alice Owner, Bob Tenant"
+                />
                 <FieldDescription>
-                  Search by unit number, owner name, tenant name, or email.
+                  Matches unit number, owner name, or tenant name.
                 </FieldDescription>
               </FieldContent>
             </Field>
+
             <Field>
-              <FieldLabel>Block or building</FieldLabel>
+              <FieldLabel htmlFor="block-filter">Block</FieldLabel>
               <FieldContent>
-                <Input placeholder="Tower A" />
-                <FieldDescription>
-                  Keep the registry scoped to a block during operations.
-                </FieldDescription>
+                <AdminSelect
+                  id="block-filter"
+                  value={filters.blockId}
+                  onChange={(event) => updateFilter("blockId", event.target.value)}
+                  disabled={isLoadingBlocks || blocks.length === 0}
+                >
+                  <option value="">All blocks</option>
+                  {blocks.map((block) => (
+                    <option key={block.id} value={String(block.id)}>
+                      {block.name}
+                    </option>
+                  ))}
+                </AdminSelect>
               </FieldContent>
             </Field>
+
             <Field>
-              <FieldLabel>Classification</FieldLabel>
+              <FieldLabel htmlFor="status-filter">Status</FieldLabel>
               <FieldContent>
-                <Input placeholder="healthy, on_installment" />
-                <FieldDescription>
-                  Filter units by collection state before taking action.
-                </FieldDescription>
+                <AdminSelect
+                  id="status-filter"
+                  value={filters.status}
+                  onChange={(event) =>
+                    updateFilter("status", event.target.value as UnitFilters["status"])
+                  }
+                >
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </AdminSelect>
+              </FieldContent>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="occupancy-filter">Occupancy</FieldLabel>
+              <FieldContent>
+                <AdminSelect
+                  id="occupancy-filter"
+                  value={filters.occupancy}
+                  onChange={(event) =>
+                    updateFilter(
+                      "occupancy",
+                      event.target.value as UnitFilters["occupancy"],
+                    )
+                  }
+                >
+                  <option value="all">All occupancy</option>
+                  <option value="true">Occupied</option>
+                  <option value="false">Vacant</option>
+                </AdminSelect>
               </FieldContent>
             </Field>
           </FieldGroup>
 
-          <Separator />
+          {blocksError ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-300">
+              {blocksError}
+            </div>
+          ) : null}
 
-          <div className="space-y-4">
-            {units.map((unit) => (
-              <div
-                key={unit.unitNumber}
-                className="rounded-2xl border border-border/70 bg-card p-5"
-              >
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div>
-                        <p className="text-base font-semibold">
-                          {unit.unitNumber}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {unit.block} · {unit.type}
-                        </p>
+          {!isLoadingBlocks && blocks.length === 0 && !blocksError ? (
+            <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
+              No blocks are available for this residence yet. Create blocks first,
+              then assign units with the required `block_id`.
+            </div>
+          ) : null}
+
+          {unitsError ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm leading-6 text-destructive">
+              {unitsError}
+            </div>
+          ) : null}
+
+          {isLoadingUnits ? (
+            <div className="grid gap-4">
+              {[0, 1, 2].map((item) => (
+                <Card key={item}>
+                  <CardContent className="space-y-3 py-5">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : null}
+
+          {!isLoadingUnits && !unitsError && units.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-10 text-center">
+              <p className="text-sm font-medium">No units match the current filters.</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Adjust the search or filters, or create the first unit for this
+                residence.
+              </p>
+            </div>
+          ) : null}
+
+          {!isLoadingUnits && !unitsError && units.length > 0 ? (
+            <div className="grid gap-4">
+              {units.map((unit) => (
+                <Card key={unit.id}>
+                  <CardContent className="flex flex-col gap-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-semibold">{unit.unit_number}</p>
+                        <Badge variant={unitStatusVariant(unit.status)}>
+                          {unit.status}
+                        </Badge>
+                        <Badge variant={occupancyVariant(unit.is_occupied)}>
+                          {getOccupancyLabel(unit)}
+                        </Badge>
                       </div>
-                      <Badge variant={unitStatusVariant(unit.status)}>
-                        {unit.status.replaceAll("_", " ")}
-                      </Badge>
-                      <Badge variant={classificationVariant(unit.classification)}>
-                        {unit.classification.replaceAll("_", " ")}
-                      </Badge>
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="flex items-start gap-3">
-                        <Avatar className="h-10 w-10 rounded-xl">
-                          <AvatarImage alt={unit.owner} />
-                          <AvatarFallback className="rounded-xl">
-                            {initials(unit.owner)}
-                          </AvatarFallback>
-                        </Avatar>
+                      <div className="grid gap-4 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
                         <div>
-                          <p className="text-sm font-medium">{unit.owner}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Owner · {unit.phone}
+                          <p className="font-medium text-foreground">Block</p>
+                          <p>{getBlockName(unit.block_id)}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Floor</p>
+                          <p>{unit.floor ?? "Not set"}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Unit type</p>
+                          <p>{unit.unit_type ?? "Not set"}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Updated</p>
+                          <p>{formatTimestamp(unit.updated_at)}</p>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="grid gap-4 text-sm sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">Owner</p>
+                          <p className="text-muted-foreground">
+                            {unit.owner_name ?? "Not set"}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            {unit.email}
+                          <p className="text-muted-foreground">
+                            {unit.owner_phone ?? "No phone"}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {unit.owner_email ?? "No email"}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">Tenant</p>
+                          <p className="text-muted-foreground">
+                            {unit.tenant_name ?? "Not set"}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {unit.tenant_phone ?? "No phone"}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {unit.tenant_email ?? "No email"}
                           </p>
                         </div>
                       </div>
-                      <div className="rounded-xl bg-muted/30 p-3">
-                        <p className="text-sm font-medium">{unit.occupancy}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Tenant: {unit.tenant}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Outstanding balance: {unit.outstanding}
-                        </p>
-                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex min-w-56 flex-col items-start gap-3 xl:items-end">
-                    <p className="text-sm text-muted-foreground">
-                      {unit.updatedAt}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm">
-                        View ledger
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          void openEditSheet(unit.id)
+                        }}
+                      >
+                        Edit
                       </Button>
-                      <Button size="sm">Edit unit</Button>
                     </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Operational checks</CardTitle>
-          <CardDescription>
-            Unit setup quality directly affects billing, notices, and resident
-            payment flows.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          {[
-            "Require unique unit numbers inside each residence and block.",
-            "Keep owner phone and email complete before monthly charge runs.",
-            "Review vacant or under-review units before collection escalation.",
-          ].map((item) => (
-            <div
-              key={item}
-              className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm leading-6 text-muted-foreground"
-            >
-              {item}
+      <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
+        <SheetContent className="w-full sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>
+              {sheetMode === "edit" ? "Edit unit" : "Add unit"}
+            </SheetTitle>
+            <SheetDescription>
+              {sheetMode === "edit"
+                ? "Load one unit from `GET /admin/units/{unit_id}` and save changes with `PATCH /admin/units/{unit_id}`."
+                : "Create a unit with the fields supported by `POST /admin/units`."}
+            </SheetDescription>
+          </SheetHeader>
+
+          <form className="flex h-full flex-col" onSubmit={handleSubmit}>
+            <div className="flex-1 space-y-6 overflow-y-auto px-4 pb-4">
+              {submitError ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm leading-6 text-destructive">
+                  {submitError}
+                </div>
+              ) : null}
+
+              {!isLoadingUnitDetail && !blocksError && blocks.length === 0 ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-300">
+                  <p>
+                    Units must be assigned to a block. Create a block first, then
+                    return here to add the unit.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3"
+                    onClick={() => {
+                      handleSheetOpenChange(false)
+                      void router.navigate({
+                        to: "/dashboard/$section/$subsection",
+                        params: {
+                          section: "residences",
+                          subsection: "blocks-buildings",
+                        },
+                      })
+                    }}
+                  >
+                    Go to Blocks & buildings
+                  </Button>
+                </div>
+              ) : null}
+
+              {isLoadingUnitDetail ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-36 w-full" />
+                </div>
+              ) : (
+                <>
+                  <FieldGroup className="grid gap-4 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="block-id">Block</FieldLabel>
+                      <FieldContent>
+                        <AdminSelect
+                          id="block-id"
+                          value={form.blockId}
+                          onChange={(event) => updateForm("blockId", event.target.value)}
+                          required
+                          disabled={isLoadingBlocks || blocks.length === 0}
+                        >
+                          <option value="">Select a block</option>
+                          {blocks.map((block) => (
+                            <option key={block.id} value={String(block.id)}>
+                              {block.name}
+                            </option>
+                          ))}
+                        </AdminSelect>
+                        <FieldDescription>
+                          Required by the backend as `block_id`.
+                        </FieldDescription>
+                      </FieldContent>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="unit-number">Unit number</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          id="unit-number"
+                          value={form.unitNumber}
+                          onChange={(event) =>
+                            updateForm("unitNumber", event.target.value)
+                          }
+                          placeholder="A-10-01"
+                          required
+                        />
+                        <FieldDescription>
+                          Required and unique within the selected block.
+                        </FieldDescription>
+                      </FieldContent>
+                    </Field>
+                  </FieldGroup>
+
+                  <FieldGroup className="grid gap-4 md:grid-cols-3">
+                    <Field>
+                      <FieldLabel htmlFor="floor">Floor</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          id="floor"
+                          value={form.floor}
+                          onChange={(event) => updateForm("floor", event.target.value)}
+                          placeholder="10"
+                        />
+                      </FieldContent>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="unit-type">Unit type</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          id="unit-type"
+                          value={form.unitType}
+                          onChange={(event) =>
+                            updateForm("unitType", event.target.value)
+                          }
+                          placeholder="standard"
+                        />
+                      </FieldContent>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="unit-status">Status</FieldLabel>
+                      <FieldContent>
+                        <AdminSelect
+                          id="unit-status"
+                          value={form.status}
+                          onChange={(event) =>
+                            updateForm("status", event.target.value as UnitStatus)
+                          }
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </AdminSelect>
+                      </FieldContent>
+                    </Field>
+                  </FieldGroup>
+
+                  <FieldGroup className="grid gap-4 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="owner-name">Owner name</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          id="owner-name"
+                          value={form.ownerName}
+                          onChange={(event) =>
+                            updateForm("ownerName", event.target.value)
+                          }
+                          placeholder="Alice Owner"
+                        />
+                      </FieldContent>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="owner-email">Owner email</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          id="owner-email"
+                          type="email"
+                          value={form.ownerEmail}
+                          onChange={(event) =>
+                            updateForm("ownerEmail", event.target.value)
+                          }
+                          placeholder="alice@example.com"
+                        />
+                      </FieldContent>
+                    </Field>
+                  </FieldGroup>
+
+                  <FieldGroup className="grid gap-4 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="owner-phone">Owner phone</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          id="owner-phone"
+                          value={form.ownerPhone}
+                          onChange={(event) =>
+                            updateForm("ownerPhone", event.target.value)
+                          }
+                          placeholder="0123456789"
+                        />
+                      </FieldContent>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="occupancy-status">Occupancy</FieldLabel>
+                      <FieldContent>
+                        <AdminSelect
+                          id="occupancy-status"
+                          value={form.isOccupied}
+                          onChange={(event) =>
+                            updateForm(
+                              "isOccupied",
+                              event.target.value as UnitFormState["isOccupied"],
+                            )
+                          }
+                        >
+                          <option value="true">Occupied</option>
+                          <option value="false">Vacant</option>
+                        </AdminSelect>
+                      </FieldContent>
+                    </Field>
+                  </FieldGroup>
+
+                  <Separator />
+
+                  <FieldGroup className="grid gap-4 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="tenant-name">Tenant name</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          id="tenant-name"
+                          value={form.tenantName}
+                          onChange={(event) =>
+                            updateForm("tenantName", event.target.value)
+                          }
+                          placeholder="Bob Tenant"
+                        />
+                      </FieldContent>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="tenant-email">Tenant email</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          id="tenant-email"
+                          type="email"
+                          value={form.tenantEmail}
+                          onChange={(event) =>
+                            updateForm("tenantEmail", event.target.value)
+                          }
+                          placeholder="bob@example.com"
+                        />
+                      </FieldContent>
+                    </Field>
+                  </FieldGroup>
+
+                  <Field>
+                    <FieldLabel htmlFor="tenant-phone">Tenant phone</FieldLabel>
+                    <FieldContent>
+                      <Input
+                        id="tenant-phone"
+                        value={form.tenantPhone}
+                        onChange={(event) =>
+                          updateForm("tenantPhone", event.target.value)
+                        }
+                        placeholder="0199999999"
+                      />
+                    </FieldContent>
+                  </Field>
+                </>
+              )}
             </div>
-          ))}
-        </CardContent>
-      </Card>
+
+            <SheetFooter className="border-t border-border/70 bg-background">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleSheetOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  isSubmitting ||
+                  isLoadingUnitDetail ||
+                  isLoadingBlocks ||
+                  blocks.length === 0
+                }
+              >
+                {isSubmitting
+                  ? sheetMode === "edit"
+                    ? "Saving..."
+                    : "Creating..."
+                  : sheetMode === "edit"
+                    ? "Save changes"
+                    : "Create unit"}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

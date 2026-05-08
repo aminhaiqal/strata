@@ -70,23 +70,14 @@ export function AdminShell({
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-6 p-4">
-          <section className="rounded-2xl border border-border/70 bg-gradient-to-br from-muted/70 via-background to-background px-5 py-6 shadow-xs sm:px-6">
-            <div className="flex max-w-3xl flex-col gap-3">
-              {badge ? (
-                <div>
-                  <span className="inline-flex items-center rounded-full border border-border/70 bg-background px-2.5 py-1 text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-                    {badge}
-                  </span>
-                </div>
-              ) : null}
-              <div className="space-y-1">
-                <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-                <p className="text-sm leading-6 text-muted-foreground sm:text-base">
-                  {description}
-                </p>
-              </div>
+          <div className="flex max-w-3xl flex-col gap-3">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+              <p className="text-sm leading-6 text-muted-foreground sm:text-base">
+                {description}
+              </p>
             </div>
-          </section>
+          </div>
           {children}
         </div>
       </SidebarInset>
