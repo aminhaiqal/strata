@@ -22,7 +22,6 @@ type BreadcrumbEntry = {
 }
 
 export function AdminShell({
-  badge,
   title,
   description,
   breadcrumbs,

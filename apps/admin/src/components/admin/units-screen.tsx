@@ -429,7 +429,6 @@ export function UnitsScreen() {
 
   const activeUnitsCount = units.filter((unit) => unit.status === "active").length
   const occupiedUnitsCount = units.filter((unit) => unit.is_occupied).length
-  const vacantUnitsCount = units.length - occupiedUnitsCount
 
   return (
     <div className="space-y-6">
